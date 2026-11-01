@@ -1,0 +1,42 @@
+# Fork overlay: build backend + frontend images directly from THIS repo
+# (gelodar/moneymatter) instead of pulling the published letehaha/* images.
+#
+# Portainer: create a Stack, paste docker-compose.yml + this file merged
+# (or use the CLI below), load your .env variables, deploy.
+#
+# CLI (from the repo root, on your server):
+#   git clone https://github.com/gelodar/moneymatter.git
+#   cd moneymatter
+#   git checkout <your-branch>          # e.g. vibe/keyless-crypto-providers-de275c
+#   cd self-hosting
+#   cp .env.example .env               # fill the REQUIRED section
+#   docker compose -f docker-compose.yml -f docker-compose.fork.yml up -d --build
+#
+# The images are tagged locally as ghcr.io/gelodar/moneymatter-{be,fe}:<branch>.
+# To also publish them (so Portainer can pull without building), log in to
+# GHCR and push:
+#   echo $GITHUB_TOKEN | docker login ghcr.io -u gelodar --password-stdin
+#   docker compose -f docker-compose.yml -f docker-compose.fork.yml push
+
+x-fork-image-tag: &fork_image_tag "${FORK_IMAGE_TAG:-local}"
+
+services:
+  backend:
+    image: ghcr.io/gelodar/moneymatter-be:*fork_image_tag
+    build:
+      context: ..
+      dockerfile: self-hosting/backend/Dockerfile
+      args:
+        SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
+
+  frontend:
+    image: ghcr.io/gelodar/moneymatter-fe:*fork_image_tag
+    build:
+      context: ..
+      dockerfile: self-hosting/frontend/Dockerfile
+      args:
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
+        VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
+        NODE_BUILD_HEAP_MB: ${NODE_BUILD_HEAP_MB:-6144}
