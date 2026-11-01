@@ -251,6 +251,19 @@ optional; see the **BUILD-FROM-SOURCE ONLY** section of
 `.env.example`. This path is memory-heavy: if the frontend build
 OOMs, add 2 GB of swap (see [troubleshooting.md](troubleshooting.md)).
 
+Forks that want their own image names (e.g. `ghcr.io/<owner>/moneymatter-be`)
+can use `docker-compose.fork.yml` instead — it tags the built images with the
+fork's GHCR namespace and a configurable tag (`FORK_IMAGE_TAG`, default
+`local`), and can push them so Portainer can pull without building:
+
+```bash
+docker compose -f docker-compose.yml \
+  -f docker-compose.fork.yml up -d --build
+# optionally publish:
+#   echo $GITHUB_TOKEN | docker login ghcr.io -u <owner> --password-stdin
+#   FORK_IMAGE_TAG=mybranch docker compose -f docker-compose.yml \
+#     -f docker-compose.fork.yml push
+
 ## 5. Backups
 
 The stateful volumes are `db_data` (Postgres), `attachments_data` (files

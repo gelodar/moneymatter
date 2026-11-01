@@ -37,8 +37,8 @@ describe('normaliseCurrency', () => {
 });
 
 describe('providerForAssetClass', () => {
-  it('routes crypto to CoinGecko', () => {
-    expect(providerForAssetClass({ assetClass: ASSET_CLASS.crypto })).toBe(SECURITY_PROVIDER.coingecko);
+  it('routes crypto to the keyless Binance provider', () => {
+    expect(providerForAssetClass({ assetClass: ASSET_CLASS.crypto })).toBe(SECURITY_PROVIDER.binance);
   });
 
   it('routes other classes to the composite provider', () => {

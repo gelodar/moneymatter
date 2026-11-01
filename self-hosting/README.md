@@ -39,6 +39,14 @@ Open `http://<host>:8080`. Full walkthrough:
 | `docker-compose.yml`         | Base stack – pulls published images, one host port      |
 | `docker-compose.traefik.yml` | Optional overlay: bundled Traefik + Let's Encrypt TLS   |
 | `docker-compose.build.yml`   | Optional overlay: build the images from source          |
+| `docker-compose.fork.yml`    | Fork overlay: build + tag images under your own GHCR namespace |
+| `docker-compose.ghcr.yml`    | Fork overlay: pull images built by the `build-fork-images.yml` Actions workflow from ghcr.io (no local build, ideal for Portainer) |
+
+Forks: `.github/workflows/build-fork-images.yml` builds and pushes
+`ghcr.io/<owner>/moneymatter-{be,fe}` on every push (tags: `latest`,
+`sha-<short>`, `<branch>`) using the automatic `GITHUB_TOKEN`. Deploy with
+`docker-compose.yml` + `docker-compose.ghcr.yml` — no build server needed.
+Set the GHCR packages to public so Portainer can pull them.
 | `.env.example`               | Configuration template – copy to `.env` and fill in     |
 | `backend/`, `frontend/`      | Dockerfiles + entrypoints for the published images      |
 | `docs/`                      | Setup guide, proxy docs, env reference, troubleshooting |

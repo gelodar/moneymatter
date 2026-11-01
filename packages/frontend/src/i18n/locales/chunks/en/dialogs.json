@@ -545,7 +545,7 @@
         "success": "Holding added.",
         "error": "Failed to add holding."
       },
-      "cryptoProviderNotConfigured": "Crypto search is unavailable. Set COINGECKO_API_KEY in your environment to enable it."
+      "cryptoProviderNotConfigured": "Crypto search is unavailable. Enable a crypto price provider (Binance/Bybit are on by default) in your environment."
     },
     "deleteInvestmentTransaction": {
       "title": "Delete transaction",

@@ -75,9 +75,16 @@ export interface HistoricalPriceOptions {
   endDate?: Date;
   /**
    * Asset class for routing in the composite provider. When set to `crypto`,
-   * the composite delegates to CoinGecko regardless of symbol shape.
+   * the composite routes to the crypto provider chain regardless of symbol shape.
    */
   assetClass?: ASSET_CLASS;
+  /**
+   * The provider the Security row was originally created with. When set and
+   * registered in the composite, it is tried first — a CoinGecko row's
+   * `providerSymbol` is a slug (e.g. "bitcoin") that the keyless exchanges
+   * can't resolve, so the row's own provider must win over the default chain.
+   */
+  providerName?: SECURITY_PROVIDER;
 }
 
 /**
@@ -101,6 +108,12 @@ export interface SecurityPriceFetchInput {
   symbol: string;
   providerSymbol: ProviderSymbol;
   assetClass: ASSET_CLASS;
+  /**
+   * Provider the Security row was created with. When set and registered in
+   * the composite, it is preferred as the primary fetch source (see
+   * `HistoricalPriceOptions.providerName` for why crypto slugs need this).
+   */
+  providerName?: SECURITY_PROVIDER;
 }
 
 /**

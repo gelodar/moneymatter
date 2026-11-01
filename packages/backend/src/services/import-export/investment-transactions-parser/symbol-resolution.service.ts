@@ -310,6 +310,6 @@ export async function resolveSymbols({
  * without spinning up the composite provider directly.
  */
 export function providerForAssetClass({ assetClass }: { assetClass: ASSET_CLASS }): SECURITY_PROVIDER {
-  if (assetClass === ASSET_CLASS.crypto) return SECURITY_PROVIDER.coingecko;
+  if (assetClass === ASSET_CLASS.crypto) return SECURITY_PROVIDER.binance;
   return SECURITY_PROVIDER.composite;
 }

@@ -44,11 +44,11 @@ const { intervalMinutes, cronExpression } = resolveSchedule();
 /**
  * Crypto intraday price sync (UTC).
  *
- * Crypto markets are 24/7 and CoinGecko's `last_updated_at` typically ticks
- * every few minutes for active coins. Cadence is tuned via
- * `CRYPTO_PRICES_SYNC_INTERVAL_MINUTES` so quota cost can be balanced against
- * freshness per environment — the CoinGecko Demo plan caps at 10k calls/month,
- * so at one batch per run a 15-minute cadence sits at ~2.9k/month.
+ * Crypto markets are 24/7 and the default keyless providers (Binance/Bybit
+ * spot tickers) update continuously. Cadence is tuned via
+ * `CRYPTO_PRICES_SYNC_INTERVAL_MINUTES`. When CoinGecko is configured it is
+ * only a fallback for coins the exchanges don't list, so its Demo-tier quota
+ * (10k calls/month) is no longer the primary constraint.
  */
 export const cryptoPricesSyncCron = createScheduledSync({
   name: 'crypto prices sync',

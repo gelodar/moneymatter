@@ -1,0 +1,24 @@
+# Fork overlay: pull the images built by the build-fork-images.yml GitHub
+# Actions workflow from ghcr.io/<owner>/moneymatter-{be,fe} — no local build
+# needed, ideal for Portainer.
+#
+# The workflow tags every push as:
+#   ghcr.io/<owner>/moneymatter-be:latest / :sha-<short-sha> / :<branch-name>
+#   ghcr.io/<owner>/moneymatter-fe:latest / :sha-<short-sha> / :<branch-name>
+#
+# Set IMAGE_TAG below (or via .env) to pin a branch or sha tag, e.g.:
+#   IMAGE_TAG=vibe-keyless-crypto-providers-de275c
+#
+# Usage (CLI, from this folder):
+#   docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+#
+# Portainer: paste docker-compose.yml + this file merged into one Stack,
+# load your .env variables, deploy. Make sure the GHCR packages are PUBLIC
+# (repo/package settings) or configure an image pull secret in Portainer.
+
+services:
+  backend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-gelodar}/moneymatter-be:${IMAGE_TAG:-latest}
+
+  frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-gelodar}/moneymatter-fe:${IMAGE_TAG:-latest}
