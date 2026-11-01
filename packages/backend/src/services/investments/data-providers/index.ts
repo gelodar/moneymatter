@@ -4,6 +4,8 @@ export * from './alphavantage-provider';
 export * from './fmp-provider';
 export * from './yahoo-provider';
 export * from './coingecko-provider';
+export * from './binance-provider';
+export * from './bybit-provider';
 export * from './composite-provider';
 export * from './provider-factory';
 export * from './utils';

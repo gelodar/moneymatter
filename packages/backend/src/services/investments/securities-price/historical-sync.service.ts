@@ -11,11 +11,12 @@ import { subYears } from 'date-fns';
 
 import { bucketByUtcDay } from './pricing-anchor';
 
-// CoinGecko Demo tier only serves up to 1 year of history. Stocks (Yahoo etc.)
-// happily go back further, so keep the longer backfill for them. Extending the
-// crypto window beyond 1y requires a second data source or a paid plan.
+// The keyless exchanges (Binance/Bybit) serve 1000 daily klines per request
+// (~2.7 years), and CoinGecko's Demo tier only 1 year — so the crypto backfill
+// window is capped at 2 years to stay within every source. Stocks (Yahoo
+// etc.) go back further, so they keep the longer window.
 const STOCK_BACKFILL_YEARS = 5;
-const CRYPTO_BACKFILL_YEARS = 1;
+const CRYPTO_BACKFILL_YEARS = 2;
 
 const syncHistoricalPricesImpl = async (securityId: string): Promise<{ count: number }> => {
   logger.info(`Starting historical price sync for securityId: ${securityId}`);
@@ -46,6 +47,7 @@ const syncHistoricalPricesImpl = async (securityId: string): Promise<{ count: nu
     startDate,
     endDate,
     assetClass: security.assetClass,
+    providerName: security.providerName,
   });
 
   if (prices.length === 0) {

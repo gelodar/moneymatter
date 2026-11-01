@@ -545,7 +545,7 @@
         "success": "Position hinzugefügt.",
         "error": "Position konnte nicht hinzugefügt werden."
       },
-      "cryptoProviderNotConfigured": "Krypto-Suche ist nicht verfügbar. Richte COINGECKO_API_KEY in deiner Umgebung ein, um sie zu aktivieren."
+      "cryptoProviderNotConfigured": "Krypto-Suche ist nicht verfügbar. Aktiviere einen Krypto-Kursanbieter (Binance/Bybit sind standardmäßig aktiv) in deiner Umgebung."
     },
     "deleteInvestmentTransaction": {
       "title": "Transaktion löschen",

@@ -6,6 +6,8 @@ import { isAxiosError } from 'axios';
 
 import { rememberSearchResults } from '../securities/verified-search-cache';
 import { AlphaVantageDataProvider } from './alphavantage-provider';
+import { BinanceDataProvider } from './binance-provider';
+import { BybitDataProvider } from './bybit-provider';
 import {
   BaseSecurityDataProvider,
   BulkPriceData,
@@ -21,6 +23,7 @@ import { FmpDataProvider } from './fmp-provider';
 import { PolygonDataProvider } from './polygon-provider';
 import { findTestFixtureSecurity } from './test-fixture-securities';
 import {
+  getCryptoSearchProviders,
   getHistoricalPriceProviderPreference,
   getLatestPriceProviderPreference,
   getSearchProviderPreference,
@@ -34,6 +37,10 @@ interface CompositeProviderOptions {
   coingeckoApiKey?: string;
   /** Defaults to true (Yahoo requires no API key). Set to false to explicitly disable. */
   yahooEnabled?: boolean;
+  /** Defaults to true (Binance public API requires no key). Set to false to disable. */
+  binanceEnabled?: boolean;
+  /** Defaults to true (Bybit public API requires no key). Set to false to disable. */
+  bybitEnabled?: boolean;
 }
 
 export class CompositeDataProvider extends BaseSecurityDataProvider {
@@ -59,6 +66,16 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
 
     if (options.coingeckoApiKey) {
       this.providers.set(SECURITY_PROVIDER.coingecko, new CoinGeckoDataProvider({ apiKey: options.coingeckoApiKey }));
+    }
+
+    // Keyless crypto exchanges are the default crypto price source: no API
+    // key required, so self-hosters get crypto prices out of the box.
+    if (options.binanceEnabled !== false) {
+      this.providers.set(SECURITY_PROVIDER.binance, new BinanceDataProvider());
+    }
+
+    if (options.bybitEnabled !== false) {
+      this.providers.set(SECURITY_PROVIDER.bybit, new BybitDataProvider());
     }
 
     if (options.yahooEnabled !== false) {
@@ -89,32 +106,26 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
     }
 
     const preference = getSearchProviderPreference();
-    const cryptoProvider = this.providers.get(SECURITY_PROVIDER.coingecko);
+    const cryptoProviderNames = getCryptoSearchProviders().filter((name) => this.providers.has(name));
 
     const stocksRequested = !options?.assetClass || options.assetClass === ASSET_CLASS.stocks;
     const cryptoRequested = !options?.assetClass || options.assetClass === ASSET_CLASS.crypto;
 
-    if (cryptoRequested && !cryptoProvider) {
-      // Crypto search routed here without CoinGecko registered (typically
-      // COINGECKO_API_KEY missing or set to the .env.template placeholder).
-      //
-      // When the caller explicitly asked for crypto (`assetClass=crypto`), fail
-      // loudly so the API responds 503 and the UI can surface the actionable
-      // "set COINGECKO_API_KEY" hint. Returning [] here would leave self-hosters
-      // staring at an empty result list with no breadcrumb.
-      //
-      // For mixed search (assetClass omitted) we still have stock results to
-      // return – log + continue so the stock half isn't sunk by the missing
-      // optional integration.
+    if (cryptoRequested && cryptoProviderNames.length === 0) {
+      // Only reachable when every crypto provider was explicitly disabled
+      // (BINANCE_ENABLED=false, BYBIT_ENABLED=false, no COINGECKO_API_KEY).
+      // The keyless exchanges are registered by default, so crypto search
+      // works without any API key in the standard setup.
       if (options?.assetClass === ASSET_CLASS.crypto) {
         throw new ServiceUnavailableError({
           code: API_ERROR_CODES.cryptoProviderNotConfigured,
-          message: 'Crypto search is unavailable. Set COINGECKO_API_KEY in your environment to enable crypto support.',
+          message:
+            'Crypto search is unavailable. Enable a crypto price provider (Binance/Bybit are on by default) to use it.',
         });
       }
       logger.warn(
-        `Crypto search requested for "${query}" but CoinGecko provider is not configured. ` +
-          `Set COINGECKO_API_KEY to enable crypto search.`,
+        `Crypto search requested for "${query}" but no crypto provider is available. ` +
+          `Binance/Bybit are enabled by default; set BINANCE_ENABLED/BYBIT_ENABLED=true or COINGECKO_API_KEY to enable crypto search.`,
       );
     }
 
@@ -130,22 +141,49 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
         })
       : Promise.resolve<SecuritySearchResult[]>([]);
 
-    const cryptoSearch =
-      cryptoRequested && cryptoProvider
-        ? cryptoProvider.searchSecurities(query, options).catch((error) => {
-            logger.error({ message: `CoinGecko search failed for "${query}"`, error: error as Error });
-            return [] as SecuritySearchResult[];
-          })
-        : Promise.resolve<SecuritySearchResult[]>([]);
+    const cryptoSearches =
+      cryptoRequested && cryptoProviderNames.length > 0
+        ? Promise.all(
+            cryptoProviderNames.map((name) =>
+              this.providers
+                .get(name)!
+                .searchSecurities(query, options)
+                .catch((error) => {
+                  logger.error({
+                    message: `Crypto search via ${name} failed for "${query}"`,
+                    error: error as Error,
+                  });
+                  return [] as SecuritySearchResult[];
+                }),
+            ),
+          )
+        : Promise.resolve([] as SecuritySearchResult[][]);
 
-    const [rawStockResults, cryptoResults] = await Promise.all([stockSearch, cryptoSearch]);
+    const [rawStockResults, cryptoResultGroups] = await Promise.all([stockSearch, cryptoSearches]);
 
     // Crypto results from a stock provider are duplicates of what CoinGecko
     // returns – drop them so the UI never shows e.g. both Yahoo's "BTC-USD"
     // and CoinGecko's "BTC".
     const stockResults = rawStockResults.filter((r) => r.assetClass !== ASSET_CLASS.crypto);
 
-    const results = [...stockResults, ...cryptoResults];
+    // Merge crypto results across providers, deduping by display symbol.
+    // CoinGecko's entry wins when present (richer metadata: logo, market-cap
+    // rank); exchange entries fill the gaps for coins CoinGecko doesn't list.
+    const cryptoBySymbol = new Map<string, SecuritySearchResult>();
+    for (const results of cryptoResultGroups) {
+      for (const r of results) {
+        const key = r.symbol.toUpperCase();
+        const existing = cryptoBySymbol.get(key);
+        if (
+          !existing ||
+          (r.providerName === SECURITY_PROVIDER.coingecko && existing.providerName !== SECURITY_PROVIDER.coingecko)
+        ) {
+          cryptoBySymbol.set(key, r);
+        }
+      }
+    }
+
+    const results = [...stockResults, ...cryptoBySymbol.values()];
     await rememberSearchResults({ results });
     return results;
   }
@@ -156,7 +194,7 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
    * existing symbol-classification rules.
    */
   public async getLatestPrice(providerSymbol: ProviderSymbol, options?: HistoricalPriceOptions): Promise<PriceData> {
-    const preference = getLatestPriceProviderPreference(providerSymbol, options?.assetClass);
+    const preference = getLatestPriceProviderPreference(providerSymbol, options?.assetClass, options?.providerName);
 
     return this.executeWithFallback(
       preference.primary,
@@ -175,7 +213,7 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
     providerSymbol: ProviderSymbol,
     options?: HistoricalPriceOptions,
   ): Promise<PriceData[]> {
-    const preference = getHistoricalPriceProviderPreference(providerSymbol, options?.assetClass);
+    const preference = getHistoricalPriceProviderPreference(providerSymbol, options?.assetClass, options?.providerName);
 
     const result = await this.executeWithFallback(
       preference.primary,
@@ -244,7 +282,7 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
       // `pricingLastSyncedAt`. A second record here sends the same data to
       // Sentry two times.
       for (const security of failedSecurities) {
-        const preference = getHistoricalPriceProviderPreference(security.symbol, security.assetClass);
+        const preference = getHistoricalPriceProviderPreference(security.symbol, security.assetClass, security.providerName);
         // Skip the primary (already failed) and try only fallback providers
         const fallbackNames = preference.fallbacks.filter((f) => f !== preference.primary);
 
@@ -296,7 +334,7 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
     const groups = new Map<SECURITY_PROVIDER, SecurityPriceFetchInput[]>();
 
     securities.forEach((security) => {
-      const preference = getHistoricalPriceProviderPreference(security.symbol, security.assetClass);
+      const preference = getHistoricalPriceProviderPreference(security.symbol, security.assetClass, security.providerName);
       const providerName = this.findAvailableProvider(preference.primary, preference.fallbacks);
 
       if (providerName) {
@@ -384,6 +422,8 @@ export class CompositeDataProvider extends BaseSecurityDataProvider {
       [SECURITY_PROVIDER.polygon]: this.providers.has(SECURITY_PROVIDER.polygon),
       [SECURITY_PROVIDER.alphavantage]: this.providers.has(SECURITY_PROVIDER.alphavantage),
       [SECURITY_PROVIDER.coingecko]: this.providers.has(SECURITY_PROVIDER.coingecko),
+      [SECURITY_PROVIDER.binance]: this.providers.has(SECURITY_PROVIDER.binance),
+      [SECURITY_PROVIDER.bybit]: this.providers.has(SECURITY_PROVIDER.bybit),
     };
   }
 }

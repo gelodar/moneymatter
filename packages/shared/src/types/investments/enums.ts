@@ -4,6 +4,10 @@ export enum SECURITY_PROVIDER {
   fmp = 'fmp',
   yahoo = 'yahoo',
   coingecko = 'coingecko',
+  // Keyless public spot exchanges — no API key required, used as the default
+  // crypto price source so self-hosters get crypto prices without any key.
+  binance = 'binance',
+  bybit = 'bybit',
   // custom provider that uses others for different operations because each provider
   // has limitations on a free plan
   composite = 'composite',

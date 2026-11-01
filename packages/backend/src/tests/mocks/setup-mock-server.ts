@@ -2,6 +2,7 @@ import { setupServer } from 'msw/node';
 
 import { akahuHandlers } from './akahu/mock-api';
 import { anthropicHandlers } from './anthropic/mock-api';
+import { cryptoExchangeHandlers } from './crypto-exchanges/mock-api';
 import { enableBankingHandlers } from './enablebanking/mock-api';
 import { exchangeRatesHandlers } from './exchange-rates/use-mock-api';
 import { geminiHandlers } from './gemini/mock-api';
@@ -17,6 +18,7 @@ import { walutomatHandlers } from './walutomat/mock-api';
 export const setupMswServer = () =>
   setupServer(
     ...exchangeRatesHandlers,
+    ...cryptoExchangeHandlers,
     ...monobankHandlers,
     ...enableBankingHandlers,
     ...lunchflowHandlers,

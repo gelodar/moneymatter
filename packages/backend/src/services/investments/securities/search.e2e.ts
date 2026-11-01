@@ -189,9 +189,11 @@ describe('GET /investments/securities/search', () => {
     expect(results.find((r) => r.symbol === 'AAPL' && r.assetClass === ASSET_CLASS.stocks)).toBeDefined();
     // Stock-provider crypto is dropped.
     expect(results.find((r) => r.symbol === 'BTCUSD')).toBeUndefined();
-    // The only crypto rows that survive come from CoinGecko (none in this mock).
+    // Surviving crypto rows come only from the crypto providers (keyless
+    // exchanges and CoinGecko), never from a stock provider.
+    const cryptoProviders = [SECURITY_PROVIDER.binance, SECURITY_PROVIDER.bybit, SECURITY_PROVIDER.coingecko];
     expect(
-      results.every((r) => r.assetClass !== ASSET_CLASS.crypto || r.providerName === SECURITY_PROVIDER.coingecko),
+      results.every((r) => r.assetClass !== ASSET_CLASS.crypto || cryptoProviders.includes(r.providerName)),
     ).toBe(true);
   });
 

@@ -5,6 +5,8 @@ import { ServiceUnavailableError } from '@js/errors';
 
 import { AlphaVantageDataProvider } from './alphavantage-provider';
 import { BaseSecurityDataProvider } from './base-provider';
+import { BinanceDataProvider } from './binance-provider';
+import { BybitDataProvider } from './bybit-provider';
 import { CoinGeckoDataProvider } from './coingecko-provider';
 import { CompositeDataProvider } from './composite-provider';
 import { FmpDataProvider } from './fmp-provider';
@@ -57,6 +59,16 @@ class DataProviderFactory {
         return new YahooDataProvider();
       }
 
+      // Keyless public spot exchanges: no API key required, always available.
+      // They are the default crypto price source for self-hosters.
+      case SECURITY_PROVIDER.binance: {
+        return new BinanceDataProvider();
+      }
+
+      case SECURITY_PROVIDER.bybit: {
+        return new BybitDataProvider();
+      }
+
       case SECURITY_PROVIDER.coingecko: {
         const apiKey = getCoinGeckoKey();
         if (!apiKey) {
@@ -75,6 +87,10 @@ class DataProviderFactory {
           alphaVantageApiKey: process.env.ALPHA_VANTAGE_API_KEY,
           coingeckoApiKey: getCoinGeckoKey(),
           yahooEnabled: process.env.YAHOO_FINANCE_ENABLED !== 'false',
+          // Keyless exchanges are always on unless explicitly disabled (e.g. a
+          // self-hosted network that blocks exchange APIs).
+          binanceEnabled: process.env.BINANCE_ENABLED !== 'false',
+          bybitEnabled: process.env.BYBIT_ENABLED !== 'false',
         });
       }
 

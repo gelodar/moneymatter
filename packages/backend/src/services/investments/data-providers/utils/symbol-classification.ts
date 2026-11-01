@@ -61,20 +61,50 @@ export function getSearchProviderPreference(): {
 }
 
 /**
- * Gets provider preference for historical price operations. Passing
- * `assetClass: ASSET_CLASS.crypto` short-circuits to CoinGecko regardless
- * of the symbol shape (CoinGecko coin slugs like "bitcoin" don't fit any
- * existing region regex).
+ * Crypto search routing. Keyless exchanges first (no API key needed), then
+ * CoinGecko when configured — its coin metadata (logos, market-cap rank) is
+ * richer, so its results are kept and de-duplicated by the composite.
  */
+export function getCryptoSearchProviders(): SECURITY_PROVIDER[] {
+  return [...CRYPTO_PROVIDER_CHAIN];
+}
+
+/**
+ * Crypto price routing. Keyless spot exchanges (Binance, then Bybit) are the
+ * default so self-hosters get crypto prices with no API key at all. CoinGecko
+ * (when COINGECKO_API_KEY is set) is appended last: it covers coins that are
+ * not listed on either exchange and provides the coin logos/market-cap ranks
+ * the search UI shows, but its free tier is rate-limited, so it must not be
+ * the primary price source.
+ *
+ * `assetClass: ASSET_CLASS.crypto` short-circuits here regardless of symbol
+ * shape (exchange pairs like "BTCUSDT" and CoinGecko slugs like "bitcoin"
+ * don't fit any region regex).
+ */
+const CRYPTO_PROVIDER_CHAIN: SECURITY_PROVIDER[] = [
+  SECURITY_PROVIDER.binance,
+  SECURITY_PROVIDER.bybit,
+  SECURITY_PROVIDER.coingecko,
+];
+
 export function getHistoricalPriceProviderPreference(
   symbol: string,
   assetClass?: ASSET_CLASS,
+  providerName?: SECURITY_PROVIDER,
 ): {
   primary: SECURITY_PROVIDER;
   fallbacks: SECURITY_PROVIDER[];
 } {
   if (assetClass === ASSET_CLASS.crypto) {
-    return { primary: SECURITY_PROVIDER.coingecko, fallbacks: [] };
+    // A row created under a specific crypto provider keeps that provider as
+    // primary: e.g. a CoinGecko row's providerSymbol is a slug ("bitcoin")
+    // the keyless exchanges can't resolve. Unknown/unregistered names fall
+    // back to the default chain (the composite skips unregistered providers).
+    if (providerName && CRYPTO_PROVIDER_CHAIN.includes(providerName)) {
+      const rest = CRYPTO_PROVIDER_CHAIN.filter((p) => p !== providerName);
+      return { primary: providerName, fallbacks: rest };
+    }
+    return { primary: CRYPTO_PROVIDER_CHAIN[0]!, fallbacks: CRYPTO_PROVIDER_CHAIN.slice(1) };
   }
 
   const region = getExchangeRegion(symbol);
@@ -98,12 +128,17 @@ export function getHistoricalPriceProviderPreference(
 export function getLatestPriceProviderPreference(
   symbol: string,
   assetClass?: ASSET_CLASS,
+  providerName?: SECURITY_PROVIDER,
 ): {
   primary: SECURITY_PROVIDER;
   fallbacks: SECURITY_PROVIDER[];
 } {
   if (assetClass === ASSET_CLASS.crypto) {
-    return { primary: SECURITY_PROVIDER.coingecko, fallbacks: [] };
+    if (providerName && CRYPTO_PROVIDER_CHAIN.includes(providerName)) {
+      const rest = CRYPTO_PROVIDER_CHAIN.filter((p) => p !== providerName);
+      return { primary: providerName, fallbacks: rest };
+    }
+    return { primary: CRYPTO_PROVIDER_CHAIN[0]!, fallbacks: CRYPTO_PROVIDER_CHAIN.slice(1) };
   }
 
   const region = getExchangeRegion(symbol);
